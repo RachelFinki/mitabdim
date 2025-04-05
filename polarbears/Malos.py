@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 from typing import Tuple
+from scipy.optimize import curve_fit
 
 GRAPH_TITLE_SIZE = 20
 INTENSITY_LABEL = 'Intensity [V]'
@@ -19,7 +20,11 @@ AXIS_LABEL_SIZE = 20
 
 matplotlib.use('TkAgg')
 
+def double_polarizers_fft(x, A, B, C):
+    return A*(np.cos(np.radians(x + B))**2) + C
 
+def triple_polarizers_fft(x, A, B, C):
+    return A*(np.cos(np.radians(x + B))*np.sin(np.radians(x + B)))**2 + C
 def extract_averages_from_excel(folder_name: str) -> np.ndarray:
     averages = []
     file_lst = os.listdir(f"{folder_name}")
@@ -43,12 +48,13 @@ def plot_double_polarizers(angle_polarizer_list, averages_list, save=False):
     intensity_uncertainty = measurement_uncertainty(I0_file)
     angle_uncertainty = ANGLE_UNCERTAINTY
     I0 = intensity_avarage(I0_file)
+    (A, B, C), pcov = curve_fit(double_polarizers_fft, double_polarizers_angles, averages_list)
     x_values = np.linspace(0, 180, 100)
-    I_values = I0 * (np.cos(np.radians(x_values))) ** 2
+    y_fit = double_polarizers_fft(x_values, A, B, C)
 
     # Fake data point
-    angle_polarizer_list = np.append(angle_polarizer_list, 60)
-    averages_list = np.append(averages_list, 0.00009)
+    # angle_polarizer_list = np.append(angle_polarizer_list, 60)
+    # averages_list = np.append(averages_list, 0.00009)
 
     plt.figure(figsize=FIGURE_SIZE)
     plt.errorbar(
@@ -65,7 +71,7 @@ def plot_double_polarizers(angle_polarizer_list, averages_list, save=False):
         label='Measured Intensity',
         ms=DATA_POINTs_SIZE
     )
-    plt.plot(x_values, I_values, color='black', label=rf'$I = {I0:.2e} \cos^2(\theta)$')
+    plt.plot(x_values, y_fit, color='black', label=rf'$I = {I0:.2e} \cos^2(\theta)$')
     plt.xlabel(DEG_LABEL, size=AXIS_LABEL_SIZE)
     plt.ylabel(INTENSITY_LABEL, size=AXIS_LABEL_SIZE)
     plt.title('Intensity vs Polarizer Angle', size=GRAPH_TITLE_SIZE)
@@ -99,7 +105,8 @@ def plot_triple_polarizers(angle_polarizer_list, averages_list, save=False):
     angle_uncertainty = ANGLE_UNCERTAINTY
     I0 = intensity_avarage(I0_file) * 4  # Maximum intensity measured at 45 degrees which is a quarter of the total intensity
     x_values = np.linspace(0, 100, 100)
-    I_values = I0 * (np.cos(np.radians(x_values)) * np.sin(np.radians(x_values))) ** 2
+    (A, B, C), pcov = curve_fit(triple_polarizers_fft, angle_polarizer_list, averages_list)
+    y_fit = triple_polarizers_fft(x_values, A, B, C)
     plt.figure(figsize=FIGURE_SIZE)
     plt.errorbar(
         angle_polarizer_list,
@@ -115,7 +122,7 @@ def plot_triple_polarizers(angle_polarizer_list, averages_list, save=False):
         label='Measured Intensity',
         ms=DATA_POINTs_SIZE
     )
-    plt.plot(x_values, I_values, color=FIT_COLOR, label=rf'$I = {I0:.2e} \cos^2(\theta)\sin^2(\theta)$')
+    plt.plot(x_values, y_fit, color=FIT_COLOR, label=rf'$I = {I0:.2e} \cos^2(\theta)\sin^2(\theta)$')
     plt.xlabel(DEG_LABEL, size=AXIS_LABEL_SIZE)
     plt.ylabel(INTENSITY_LABEL, size=AXIS_LABEL_SIZE)
     plt.title('Intensity vs Polarizer Angle', size=GRAPH_TITLE_SIZE)
@@ -126,7 +133,7 @@ def plot_triple_polarizers(angle_polarizer_list, averages_list, save=False):
         plt.savefig(f"figures{os.sep}triple polarizers.pdf", format="pdf")
     plt.show()
 
-
+half_wave_angles = [0, 350, 340, 10, 20, 80, 90, 100, 160, 170, 180, 190, 200]
 double_polarizers_angles = np.array([0, 10, 350, 20, 340, 80, 270, 250, 100, 300, 70, 90, 355, 330])
 double_polarizers_angles = fix_angles(double_polarizers_angles, 350, 180)
 
@@ -135,3 +142,4 @@ triple_polarizers_angles = fix_angles(triple_polarizers_angles, 75, 90)  # Max v
 if __name__ == "__main__":
     plot_double_polarizers(double_polarizers_angles, extract_averages_from_excel("double polarizers"), True)
     plot_triple_polarizers(triple_polarizers_angles, extract_averages_from_excel("triple polarizers"), True)
+    print(np.sin(np.radians(90)))
